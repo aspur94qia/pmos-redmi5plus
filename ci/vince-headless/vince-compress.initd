@@ -1,0 +1,19 @@
+#!/sbin/openrc-run
+description="vince-compress: proxy kompresi data HTTP (port 80) dengan iptables redirect"
+command="/usr/bin/python3"
+command_args="/usr/local/bin/vince-compress.py"
+command_background=true
+pidfile="/run/vince-compress.pid"
+depend() { need net; after firewall; }
+
+start_pre() {
+    # Redirect traffic HTTP (port 80) dari client hotspot (wlan0) ke proxy
+    iptables -t nat -C PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-ports 8888 2>/dev/null \
+        || iptables -t nat -A PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-ports 8888
+    ebegin "Redirect HTTP port 80 -> proxy kompresi (8888)"
+}
+
+stop_post() {
+    iptables -t nat -D PREROUTING -i wlan0 -p tcp --dport 80 -j REDIRECT --to-ports 8888 2>/dev/null
+    ebegin "Menghapus redirect kompresi"
+}

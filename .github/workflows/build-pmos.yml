@@ -1,0 +1,55 @@
+name: Build pmOS Vince Headless
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pmbootstrap
+        run: |
+          git config --global http.userAgent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+          pipx install --force "git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git"
+          pipx inject pmbootstrap tomli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build image
+        env:
+          HOTSPOT_PSK: ${{ secrets.HOTSPOT_PSK }}
+          PMOS_PASSWORD: ${{ secrets.PMOS_PASSWORD }}
+        run: bash ci/build.sh
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmos-vince
+          path: output/
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Publish ke GitHub Releases
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: "pmOS Vince build ${{ github.run_number }}"
+          body_path: RELEASE.md
+          files: output/*
+          make_latest: true
+          fail_on_unmatched_files: true
+      - name: Upload log (kalau gagal)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmbootstrap-log
+          path: ~/.local/var/pmbootstrap/log.txt
+          if-no-files-found: ignore

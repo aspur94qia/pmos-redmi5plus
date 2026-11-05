@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pmos-vince Control Center | postmarketOS Router</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            900: '#0b0f19',
+                            800: '#111827',
+                            700: '#1f2937',
+                            accent: '#06b6d4',
+                            glow: '#3b82f6',
+                            danger: '#ef4444',
+                            success: '#10b981',
+                            warning: '#f59e0b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #111827; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        .glow-accent { box-shadow: 0 0 15px rgba(6, 182, 212, 0.25); }
+        .glow-danger { box-shadow: 0 0 15px rgba(239, 68, 68, 0.25); }
+    </style>
+</head>
+<body class="bg-cyber-900 text-gray-100 min-h-screen flex flex-col antialiased selection:bg-cyber-accent selection:text-black">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Modal Dialog Reboot -->
+    <div id="reboot-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cyber-800 border border-red-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl glow-danger">
+            <div class="flex items-center gap-4 text-red-500 mb-4">
+                <div class="p-3 bg-red-500/10 rounded-xl">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Reboot Perangkat</h3>
+                    <p class="text-sm text-gray-400">Konfirmasi restart sistem router pmos-vince</p>
+                </div>
+            </div>
+            <p class="text-gray-300 text-sm mb-6">Apakah Anda yakin ingin menyalakan ulang router? Semua koneksi hotspot dan layanan aktif akan terputus sementara waktu selama proses booting (est. 45 detik).</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeRebootModal()" class="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-medium transition">Batal</button>
+                <button onclick="confirmReboot()" class="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition flex items-center gap-2">
+                    <i class="fa-solid fa-power-off"></i> Reboot Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIN SCREEN CONTAINER -->
+    <div id="login-screen" class="fixed inset-0 z-40 bg-cyber-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-cyber-800 border border-gray-700/60 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <!-- Background Glow Decor -->
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-cyber-accent/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-12 -left-12 w-40 h-40 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 text-cyber-accent mb-4 glow-accent">
+                    <i class="fa-solid fa-microchip text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white tracking-wide">pmos-vince Web UI</h1>
+                <p class="text-xs text-gray-400 mt-1">postmarketOS Router Control Panel • Xiaomi Redmi 5 Plus</p>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="login-user" required value="admin" class="w-full pl-11 pr-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyber-accent transition text-sm" placeholder="Masukkan username">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="login-pass" required value="vince123" class="w-full pl-11 pr-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyber-accent transition text-sm" placeholder="Masukkan password">
+                    </div>
+                </div>
+
+                <button type="button" onclick="handleLogin(event)" class="w-full py-3.5 bg-gradient-to-r from-cyber-accent to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl shadow-lg transition duration-200 flex items-center justify-center gap-2 text-sm mt-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> <span id="login-btn-text">Masuk Dashboard</span>
+                </button>
+            </form>
+
+            <div class="mt-8 pt-6 border-t border-gray-700/50 text-center">
+                <p class="text-xs text-gray-500">Default Credentials: <code class="text-cyber-accent bg-cyber-900 px-2 py-1 rounded">admin / vince123</code></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD INTERFACE -->
+    <div id="dashboard-screen" class="hidden flex-1 flex flex-col min-h-screen">
+        
+        <!-- HEADER TOP NAVIGATION BAR -->
+        <header class="bg-cyber-800/80 backdrop-blur-md border-b border-gray-800 sticky top-0 z-30 px-4 lg:px-8 py-3">
+            <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                
+                <!-- Brand & Hostname -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyber-accent/10 border border-cyber-accent/40 flex items-center justify-center text-cyber-accent">
+                        <i class="fa-solid fa-router text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white tracking-tight text-base">pmos-vince</span>
+                            <span class="px-2 py-0.5 text-[10px] font-mono font-bold bg-green-500/10 text-green-400 border border-green-500/30 rounded-full flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> ONLINE
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 font-mono">192.168.1.1 • postmarketOS v23.12</p>
+                    </div>
+                </div>
+
+                <!-- Right Header Actions: Battery Status & Logout -->
+                <div class="flex items-center gap-3">
+                    <!-- Real-time Battery Indicator -->
+                    <div class="bg-cyber-900 border border-gray-700/80 rounded-xl px-3.5 py-1.5 flex items-center gap-3">
+                        <div class="relative flex items-center justify-center">
+                            <i id="bat-icon" class="fa-solid fa-battery-three-quarters text-cyber-accent text-lg"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-1">
+                                <span id="bat-val" class="font-mono text-xs font-bold text-white">--%</span>
+                                <span id="bat-status-badge" class="text-[9px] px-1.5 py-0.2 bg-gray-800 text-gray-300 rounded font-semibold">STANDBY</span>
+                            </div>
+                            <span id="bat-temp" class="text-[10px] text-gray-400 font-mono">--°C</span>
+                        </div>
+                    </div>
+
+                    <!-- Logout Button -->
+                    <button onclick="handleLogout()" class="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="hidden sm:inline">Keluar</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN NAVIGATION TABS (SCROLLABLE MOBILE) -->
+        <div class="bg-cyber-800 border-b border-gray-800 px-4 lg:px-8">
+            <div class="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto py-2 custom-scrollbar">
+                <button onclick="switchTab('tab-status')" id="btn-tab-status" class="tab-btn active font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/40">
+                    <i class="fa-solid fa-chart-line"></i> Status System
+                </button>
+                <button onclick="switchTab('tab-ap')" id="btn-tab-ap" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-wifi"></i> Hotspot & AP
+                </button>
+                <button onclick="switchTab('tab-repeater')" id="btn-tab-repeater" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-rotate"></i> Wi-Fi Repeater
+                </button>
+                <button onclick="switchTab('tab-sim')" id="btn-tab-sim" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-sim-card"></i> SIM & TTL
+                </button>
+                <button onclick="switchTab('tab-audio')" id="btn-tab-audio" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-sliders"></i> Audio Dolby
+                </button>
+                <button onclick="switchTab('tab-bt')" id="btn-tab-bt" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-brands fa-bluetooth-b"></i> Bluetooth Receiver
+                </button>
+                <button onclick="switchTab('tab-usb')" id="btn-tab-usb" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-usb"></i> USB & ADB
+                </button>
+                <button onclick="switchTab('tab-led')" id="btn-tab-led" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-lightbulb"></i> LED Control
+                </button>
+                <button onclick="switchTab('tab-nas')" id="btn-tab-nas" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-hard-drive"></i> Samba & Web App
+                </button>
+                <button onclick="switchTab('tab-diag')" id="btn-tab-diag" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-vial-virus"></i> Diagnostik
+                </button>
+                <button onclick="switchTab('tab-openwrt')" id="btn-tab-openwrt" class="tab-btn font-medium text-xs px-4 py-2.5 rounded-xl whitespace-nowrap transition flex items-center gap-2 text-gray-400 hover:text-white hover:bg-gray-800">
+                    <i class="fa-solid fa-router"></i> OpenWrt
+                </button>
+            </div>
+        </div>
+
+        <!-- CONTENT PANELS CONTAINER -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8">
+            
+            <!-- 📊 TAB 1: STATUS HARDWARE REAL-TIME -->
+            <section id="tab-status" class="tab-content space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-gauge-high text-cyber-accent"></i> Telemetri Hardware & Sistem
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Pembaruan data otomatis setiap 3 detik via `/api/status`</p>
+                    </div>
+                    <span class="text-xs font-mono text-gray-400 flex items-center gap-2 bg-cyber-800 px-3 py-1.5 rounded-lg border border-gray-700">
+                        <i class="fa-solid fa-arrows-rotate animate-spin text-cyber-accent"></i> <span id="status-timer">Updating in 3s</span>
+                    </span>
+                </div>
+
+                <!-- Status Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- CPU Load Card -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">CPU Load (MSM8953)</span>
+                            <i class="fa-solid fa-microchip text-cyber-accent text-lg"></i>
+                        </div>
+                        <div class="text-2xl font-bold font-mono text-white mb-2" id="stat-cpu-load">0.42, 0.38, 0.35</div>
+                        <p class="text-xs text-gray-400">Load Average (1m, 5m, 15m)</p>
+                        <div class="w-full bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
+                            <div id="stat-cpu-bar" class="bg-cyber-accent h-full w-[35%] transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- RAM Usage Card -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Memori RAM (3 GB)</span>
+                            <i class="fa-solid fa-memory text-blue-400 text-lg"></i>
+                        </div>
+                        <div class="text-2xl font-bold font-mono text-white mb-2"><span id="stat-ram-used">1120</span> <span class="text-sm font-normal text-gray-400">/ 2950 MB</span></div>
+                        <p class="text-xs text-gray-400">Penggunaan: <span id="stat-ram-pct" class="text-blue-400 font-bold">38%</span></p>
+                        <div class="w-full bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
+                            <div id="stat-ram-bar" class="bg-blue-500 h-full w-[38%] transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- Battery & Power Card -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Baterai & Daya</span>
+                            <i class="fa-solid fa-bolt text-yellow-400 text-lg"></i>
+                        </div>
+                        <div class="text-2xl font-bold font-mono text-white mb-2"><span id="stat-bat-val" class="font-mono">--%</span></div>
+                        <div class="flex items-center gap-2 text-xs text-gray-400">
+                            <span>Suhu: <strong id="stat-bat-temp" class="text-yellow-400">33.5°C</strong></span> • 
+                            <span id="stat-bat-status" class="text-green-400 font-semibold">Discharging</span>
+                        </div>
+                        <div class="w-full bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
+                            <div id="stat-bat-bar" class="bg-yellow-400 h-full w-[84%] transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- System Uptime Card -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">System Uptime</span>
+                            <i class="fa-solid fa-clock text-green-400 text-lg"></i>
+                        </div>
+                        <div class="text-2xl font-bold font-mono text-white mb-2" id="stat-uptime">2d 14h 32m</div>
+                        <p class="text-xs text-gray-400">Gateway IP: <span class="text-green-400 font-mono font-bold">192.168.1.1</span></p>
+                        <div class="w-full bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
+                            <div class="bg-green-500 h-full w-full"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Interface Status Panel -->
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-network-wired text-cyber-accent"></i> Status Antarmuka Jaringan (Interfaces)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+                        <div class="p-4 bg-cyber-900 rounded-xl border border-gray-800">
+                            <div class="flex items-center justify-between text-gray-400 mb-1">
+                                <span>wlan0 (AP / Hotspot)</span>
+                                <span class="text-green-400 font-bold">UP</span>
+                            </div>
+                            <div class="text-white font-bold text-sm">192.168.1.1/24</div>
+                            <div class="text-[11px] text-gray-500 mt-2">Driver: ath6kl_sdio • Client: <span class="text-cyber-accent">4 Active</span></div>
+                        </div>
+
+                        <div class="p-4 bg-cyber-900 rounded-xl border border-gray-800">
+                            <div class="flex items-center justify-between text-gray-400 mb-1">
+                                <span>rmnet_data0 (4G LTE)</span>
+                                <span class="text-green-400 font-bold" id="iface-lte-status">CONNECTED</span>
+                            </div>
+                            <div class="text-white font-bold text-sm" id="iface-lte-ip">10.142.88.19</div>
+                            <div class="text-[11px] text-gray-500 mt-2">APN: <span class="text-gray-300" id="iface-lte-apn">internet</span> • Band 3 (1800 MHz)</div>
+                        </div>
+
+                        <div class="p-4 bg-cyber-900 rounded-xl border border-gray-800">
+                            <div class="flex items-center justify-between text-gray-400 mb-1">
+                                <span>rndis0 (USB Tether)</span>
+                                <span class="text-gray-500 font-bold">DISCONNECTED</span>
+                            </div>
+                            <div class="text-gray-500 font-bold text-sm">0.0.0.0</div>
+                            <div class="text-[11px] text-gray-500 mt-2">Mode: ADB + OTG Host</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 📡 TAB 2: HOTSPOT & AP WI-FI -->
+            <section id="tab-ap" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-wifi text-cyber-accent"></i> Konfigurasi Hotspot & AP Wi-Fi (vince-ap)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Kelola SSID, Sandi WPA2, dan restart pemancar Wi-Fi NetworkManager</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-2xl">
+                    <form onsubmit="saveHotspot(event)" class="space-y-5">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Nama Wi-Fi (SSID)</label>
+                            <input type="text" id="ap-ssid" required value="pmos-vince-AP" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Kata Sandi WPA2-PSK</label>
+                            <div class="relative">
+                                <input type="password" id="ap-pass" required value="vince123" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                                <button type="button" onclick="togglePassVisibility('ap-pass')" class="absolute right-4 top-3.5 text-gray-500 hover:text-gray-300">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-gray-500 mt-1">Minimal 8 karakter kata sandi.</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Frekuensi / Kanal</label>
+                                <select class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent">
+                                    <option value="2.4GHz">2.4 GHz (Kanal Auto / 6)</option>
+                                    <option value="5GHz">5 GHz (Kanal 36)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Enkripsi Security</label>
+                                <select class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent">
+                                    <option value="wpa2">WPA2-PSK (AES)</option>
+                                    <option value="open">Open (No Password)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 flex justify-end">
+                            <button type="submit" id="btn-save-hotspot" class="px-6 py-3 bg-cyber-accent hover:bg-cyan-400 text-black font-bold rounded-xl text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-rotate-right"></i> Simpan & Restart Hotspot
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 🔄 TAB 3: WI-FI REPEATER -->
+            <section id="tab-repeater" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-rotate text-cyber-accent"></i> Wi-Fi Repeater & Upstream (vince-repeater)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Pindai dan sambungkan antarmuka Wi-Fi ke akses poin terdekat</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-2xl space-y-6">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-white">Pemindai Sinyal Wi-Fi Terdekat</span>
+                        <button onclick="scanWifi()" id="btn-scan-wifi" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass text-cyber-accent"></i> Pindai Wi-Fi Live
+                        </button>
+                    </div>
+
+                    <form onsubmit="connectRepeater(event)" class="space-y-5">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Pilih Wi-Fi Target (SSID)</label>
+                            <select id="wifi-target-select" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                                <option value="">-- Klik Pindai untuk Mencari --</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Kata Sandi Wi-Fi Upstream</label>
+                            <input type="password" id="repeater-pass" placeholder="Masukkan password Wi-Fi tujuan" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                        </div>
+
+                        <div class="pt-2 flex justify-end">
+                            <button type="submit" id="btn-connect-repeater" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-plug-circle-check"></i> Hubungkan Upstream
+                            </button>
+                        </div>
+                    </form>
+                    <button onclick="clearRepeater()" id="btn-clear-repeater" class="w-full px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-xmark"></i> Matikan Repeater (kembali ke mode hotspot saja)
+                    </button>
+                </div>
+            </section>
+
+            <!-- 📶 TAB 4: DATA SELULER, SINYAL & TTL -->
+            <section id="tab-sim" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-sim-card text-cyber-accent"></i> Data Seluler, IMEI Spoofing & TTL (vince-sim)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Pengaturan modem Qualcomm MSM8953 `/dev/ttyUSB0` & aturan firewall TTL</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Modem Data Control -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 space-y-5">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-b border-gray-700/60 pb-3 flex items-center justify-between">
+                            <span>Koneksi Data & Lock Sinyal</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400">Data State:</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-cellular-data" checked onchange="toggleCellularData(this)" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyber-accent"></div>
+                                </label>
+                            </div>
+                        </h3>
+
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">APN Provider Seluler</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="sim-apn" value="internet" class="flex-1 px-4 py-2.5 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                                <button onclick="saveAPN()" id="btn-save-apn" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-xs font-semibold">Set APN</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Lock Mode Sinyal Modem</label>
+                            <select id="sim-network-mode" onchange="changeNetworkLock(this)" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent">
+                                <option value="lte_only">Lock 4G LTE Only (Band 1/3/8/40)</option>
+                                <option value="auto">Auto 4G / 3G / 2G (Preferred)</option>
+                                <option value="wcdma">3G WCDMA / HSPA Only</option>
+                            </select>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-700/60">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-sm font-bold text-white block">Bypass Tethering TTL 64</span>
+                                    <span class="text-xs text-gray-400">Aturan iptables mangling packet TTL ke 64</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-ttl-bypass" checked onchange="toggleTTLBypass(this)" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IMEI Management -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 space-y-5">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-b border-gray-700/60 pb-3 flex items-center justify-between">
+                            <span>Backup IMEI Qualcomm (read-only)</span>
+                            <span class="text-xs font-mono text-gray-400">ttyUSB0</span>
+                        </h3>
+
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">IMEI Aktif Saat Ini (read-only)</label>
+                            <input type="text" id="current-imei" readonly placeholder="-- klik Backup IMEI untuk membaca dari modem --" class="w-full px-4 py-2.5 bg-cyber-900/60 border border-gray-800 rounded-xl text-cyber-accent font-mono text-sm font-bold">
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button onclick="backupIMEI()" id="btn-backup-imei" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl text-xs transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-download text-cyber-accent"></i> Backup IMEI (read-only)
+                            </button>
+                        </div>
+
+                        <p class="text-[11px] text-yellow-500/90 bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-2.5 leading-relaxed">
+                            <i class="fa-solid fa-shield-halved"></i> <strong>Penulisan / spoofing IMEI tidak didukung</strong> oleh web UI ini untuk alasan legal &amp; keamanan. Hanya backup read-only yang tersedia.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 🎛️ TAB 5: AUDIO MSM8953 & DOLBY PRESET -->
+            <section id="tab-audio" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-cyber-accent"></i> Audio MSM8953 & Preset Dolby (vince-audio)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Pengaturan Equalizer 5-Band dan Preset Suara PulseAudio Bluetooth Receiver</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-3xl space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pb-4 border-b border-gray-700/60">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Volume Speaker (0-150%)</label>
+                            <input type="range" id="audio-volume" min="0" max="150" value="100" oninput="document.getElementById('audio-volume-val').textContent=this.value+'%'" onchange="setVolume(this.value)" class="w-full accent-cyber-accent cursor-pointer">
+                            <span class="text-[11px] font-mono text-cyber-accent" id="audio-volume-val">100%</span>
+                        </div>
+                        <button onclick="toggleMuteBtn()" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-xs font-semibold">
+                            <i class="fa-solid fa-volume-high"></i> Mute / Unmute (toggle)
+                        </button>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Preset Dolby Atmos Style</label>
+                        <select id="audio-dolby-preset" onchange="applyDolbyPreset(this.value)" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent font-semibold">
+                            <option value="flat">Dolby Off / Flat Neutral</option>
+                            <option value="dynamic" selected>Dolby Dynamic (Auto Smart)</option>
+                            <option value="movie">Dolby Movie (Surround & Clear Voice)</option>
+                            <option value="music">Dolby Music (Vocal Warmth & Clarity)</option>
+                            <option value="game">Dolby Game (Spatial Audio)</option>
+                            <option value="bass">Extreme Bass Boost (Sub-Woofer Tuning)</option>
+                        </select>
+                    </div>
+
+                    <!-- 5-Band Equalizer Sliders -->
+                    <div class="pt-4 border-t border-gray-700/60">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-6">Manual Equalizer 5-Band (Gain -12dB hingga +12dB)</h4>
+                        <div class="grid grid-cols-5 gap-4 text-center">
+                            
+                            <!-- 60Hz -->
+                            <div class="flex flex-col items-center gap-3">
+                                <span id="eq-val-60" class="text-xs font-mono font-bold text-cyber-accent">+2 dB</span>
+                                <input type="range" min="-12" max="12" value="2" oninput="updateEqValue('60', this.value)" class="h-32 accent-cyber-accent cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;">
+                                <span class="text-xs font-mono text-gray-400">60 Hz</span>
+                            </div>
+
+                            <!-- 230Hz -->
+                            <div class="flex flex-col items-center gap-3">
+                                <span id="eq-val-230" class="text-xs font-mono font-bold text-cyber-accent">+4 dB</span>
+                                <input type="range" min="-12" max="12" value="4" oninput="updateEqValue('230', this.value)" class="h-32 accent-cyber-accent cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;">
+                                <span class="text-xs font-mono text-gray-400">230 Hz</span>
+                            </div>
+
+                            <!-- 910Hz -->
+                            <div class="flex flex-col items-center gap-3">
+                                <span id="eq-val-910" class="text-xs font-mono font-bold text-cyber-accent">0 dB</span>
+                                <input type="range" min="-12" max="12" value="0" oninput="updateEqValue('910', this.value)" class="h-32 accent-cyber-accent cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;">
+                                <span class="text-xs font-mono text-gray-400">910 Hz</span>
+                            </div>
+
+                            <!-- 4kHz -->
+                            <div class="flex flex-col items-center gap-3">
+                                <span id="eq-val-4k" class="text-xs font-mono font-bold text-cyber-accent">+3 dB</span>
+                                <input type="range" min="-12" max="12" value="3" oninput="updateEqValue('4k', this.value)" class="h-32 accent-cyber-accent cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;">
+                                <span class="text-xs font-mono text-gray-400">4 kHz</span>
+                            </div>
+
+                            <!-- 14kHz -->
+                            <div class="flex flex-col items-center gap-3">
+                                <span id="eq-val-14k" class="text-xs font-mono font-bold text-cyber-accent">+5 dB</span>
+                                <input type="range" min="-12" max="12" value="5" oninput="updateEqValue('14k', this.value)" class="h-32 accent-cyber-accent cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;">
+                                <span class="text-xs font-mono text-gray-400">14 kHz</span>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end">
+                        <button onclick="saveEqualizer()" id="btn-save-eq" class="px-6 py-3 bg-cyber-accent hover:bg-cyan-400 text-black font-bold rounded-xl text-sm transition">
+                            Simpan Tuning Equalizer
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 🔵 TAB 6: BLUETOOTH RECEIVER -->
+            <section id="tab-bt" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-brands fa-bluetooth-b text-cyber-accent"></i> Bluetooth Receiver (vince-pulse-bluetooth)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Ubah nama broadcast receiver A2DP dan pantau perangkat yang tersambung</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-2xl space-y-6">
+                    <form onsubmit="saveBluetoothAlias(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Nama Broadcast Alias Bluetooth</label>
+                            <input type="text" id="bt-alias-name" required value="pmos-vince" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-cyber-accent">
+                            <p class="text-[11px] text-gray-500 mt-1">Nama ini akan terlihat saat dipindai dari HP / Laptop pengirim audio.</p>
+                        </div>
+                        <button type="submit" id="btn-save-bt" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition">
+                            Terapkan Nama Bluetooth (`bluetoothctl system-alias`)
+                        </button>
+                    </form>
+
+                    <div class="flex gap-3">
+                        <button onclick="toggleBT('start')" class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl text-xs transition">
+                            <i class="fa-solid fa-play"></i> Start Layanan Bluetooth
+                        </button>
+                        <button onclick="toggleBT('stop')" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition">
+                            <i class="fa-solid fa-stop"></i> Stop Layanan Bluetooth
+                        </button>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-700/60">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Status Koneksi A2DP Sink</h4>
+                        <div class="p-4 bg-cyber-900 rounded-xl border border-gray-800 font-mono text-xs space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Status Streaming:</span>
+                                <span class="text-green-400 font-bold">ACTIVE (Streaming Audio)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Perangkat Terhubung:</span>
+                                <span class="text-white">Redmi Note 12 (74:45:CE:89:12:AA)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Codec Audio Active:</span>
+                                <span class="text-cyber-accent font-bold">SBC-XQ (High Bitrate 453 kbps)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 🛠️ TAB 7: KONTROL ADB ENGINE & USB -->
+            <section id="tab-usb" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-usb text-cyber-accent"></i> Kontrol ADB Engine & USB Gadget (vince-usb)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Konfigurasi fungsi port USB Type-B/C dan otorisasi sertifikat ADB</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-2xl space-y-6">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Mode Port USB Gadget</label>
+                        <select id="usb-gadget-mode" onchange="changeUsbMode(this.value)" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent">
+                            <option value="adb_only">ADB Shell Only (Debug Mode)</option>
+                            <option value="adb_otg" selected>ADB + USB OTG Host Mode (Mass Storage)</option>
+                            <option value="adb_mtp">ADB + MTP File Transfer</option>
+                            <option value="rndis">RNDIS USB Network Tethering</option>
+                        </select>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-700/60 flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-bold text-white block">Auto Allow ADB Key Certificate</span>
+                            <span class="text-xs text-gray-400">Otomatis menyalin sertifikat public key adb_keys ke `/root/.android/`</span>
+                        </div>
+                        <button onclick="autoAllowADB()" id="btn-adb-sync" class="px-5 py-2.5 bg-cyber-accent hover:bg-cyan-400 text-black font-bold rounded-xl text-xs transition">
+                            <i class="fa-solid fa-key"></i> Sync adb_keys
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 💡 TAB 8: PENGATURAN LED HARDWARE -->
+            <section id="tab-led" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-lightbulb text-cyber-accent"></i> Pengaturan Indikator LED Hardware (vince-led)
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Atur kedipan indikator LED fisik saat boot & tingkat kecerahan manual (0-255)</p>
+                </div>
+
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 max-w-2xl space-y-6">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Preset Trigger & Blink LED</label>
+                        <select id="led-trigger-select" onchange="changeLedTrigger(this.value)" class="w-full px-4 py-3 bg-cyber-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-cyber-accent">
+                            <option value="blink_1">Kedip Kilat 1x (Device Booting)</option>
+                            <option value="blink_2">Kedip Kilat 2x (System Ready)</option>
+                            <option value="blink_3" selected>Kedip Kilat 3x (Hotspot Aktif)</option>
+                            <option value="blink_4">Kedip Kilat 4x (Client Connected)</option>
+                            <option value="blink_5">Kedip Kilat 5x (Warning / Error)</option>
+                            <option value="charging">Charging Pulse Indicator</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-gray-400">Manual Brightness LED (PWM Scale 0-255)</label>
+                            <span id="led-val-disp" class="text-xs font-mono font-bold text-cyber-accent">180</span>
+                        </div>
+                        <input type="range" min="0" max="255" value="180" oninput="updateLedBrightness(this.value)" class="w-full accent-cyber-accent cursor-pointer">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 💾 TAB 9: SAMBA NAS & WEB SERVICES -->
+            <section id="tab-nas" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-hard-drive text-cyber-accent"></i> Samba NAS & Layanan Web
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Pintasan cepat ke Web Terminal `ttyd`, Downloader `AriaNg`, dan Samba File Server</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- ttyd Web Terminal -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400">
+                            <i class="fa-solid fa-terminal text-xl"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white">Web Terminal (ttyd)</h3>
+                        <p class="text-xs text-gray-400">Akses langsung ke Shell Linux postmarketOS via browser pada port 7681.</p>
+                        <a href="http://192.168.1.1:7681" target="_blank" class="block w-full py-2.5 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl text-center text-xs transition">
+                            Buka Terminal (Port 7681) <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
+                        </a>
+                    </div>
+
+                    <!-- AriaNg Downloader -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                            <i class="fa-solid fa-download text-xl"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white">Aria2 Downloader (AriaNg)</h3>
+                        <p class="text-xs text-gray-400">Pengelola unduhan cepat multi-thread Aria2 pada port 6800.</p>
+                        <a href="http://192.168.1.1:6800" target="_blank" class="block w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-center text-xs transition">
+                            Buka AriaNg (Port 6800) <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
+                        </a>
+                    </div>
+
+                    <!-- Samba NAS Service -->
+                    <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-6 space-y-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                            <i class="fa-solid fa-folder-open text-xl"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white">Samba File Server (smbd)</h3>
+                        <p class="text-xs text-gray-400">Server berbagi berkas lokal (`\\192.168.1.1\pmos-share`).</p>
+                        <button onclick="restartSamba()" id="btn-restart-samba" class="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-center text-xs transition">
+                            <i class="fa-solid fa-rotate"></i> Restart Service Samba
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 🧪 TAB 10: DIAGNOSTIK SISTEM & DAYA -->
+            <section id="tab-diag" class="tab-content space-y-6 hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-vial-virus text-cyber-accent"></i> Diagnostik Hardware & Daya (vince-diag)
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Uji kelayakan komponen hardware via `/api/diag` (`vince-diag` & `vince-audio-diag`)</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="runDiagnostics()" id="btn-run-diag" class="px-4 py-2 bg-cyber-accent hover:bg-cyan-400 text-black rounded-xl text-xs font-bold transition flex items-center gap-2">
+                            <i class="fa-solid fa-play"></i> Jalankan Tes Hardware
+                        </button>
+                        <button onclick="openRebootModal()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
+                            <i class="fa-solid fa-power-off"></i> Reboot Device
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Log Output Console Box -->
+                <div class="bg-cyber-800 border border-gray-800 rounded-2xl p-5 space-y-3">
+                    <div class="flex items-center justify-between border-b border-gray-700/60 pb-3">
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2 font-mono">
+                            <i class="fa-solid fa-terminal text-green-400"></i> Terminal Output Logs
+                        </span>
+                        <button onclick="clearDiagLogs()" class="text-xs text-gray-500 hover:text-gray-300">Clear Logs</button>
+                    </div>
+                    <pre id="diag-log-box" class="bg-cyber-900 border border-gray-900 rounded-xl p-4 font-mono text-xs text-green-400 h-80 overflow-y-auto custom-scrollbar leading-relaxed">
+[INIT] pmos-vince diagnostic engine ready.
+[INFO] Click 'Jalankan Tes Hardware' to initiate vince-diag execution...
+                    </pre>
+                </div>
+            </section>
+
+            <!-- ===== TAB OPENWRT / ROUTER EXTRAS ===== -->
+            <section id="tab-openwrt" class="tab-content space-y-6">
+                <div class="card p-5 rounded-2xl border border-cyber-accent/30 bg-gradient-to-br from-cyber-accent/5 to-transparent">
+                    <h3 class="text-cyber-accent font-bold text-sm flex items-center gap-2 mb-1"><i class="fa-solid fa-router"></i> FITUR ROUTER OPENWRT</h3>
+                    <p class="text-xs text-gray-400 mb-4">Semua layanan berjalan langsung di vince (postmarketOS). Toggle ON/OFF tersinkron ke perangkat. Paket di-install otomatis oleh <code class="text-cyber-accent">install-router-extras.sh</code>.</p>
+                    <div id="owrt-services" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- diisi oleh JS -->
+                    </div>
+                </div>
+
+                <div class="card p-5 rounded-2xl border border-green-500/30 bg-gradient-to-br from-green-500/5 to-transparent">
+                    <h3 class="text-green-400 font-bold text-sm flex items-center gap-2 mb-3"><i class="fa-solid fa-compress"></i> KOMPRESI DATA (HEMAT KUOTA) — REAL-TIME via RAM</h3>
+                    <div class="grid grid-cols-3 gap-3 mb-4 text-center">
+                        <div class="bg-black/30 rounded-xl p-3">
+                            <div class="text-[10px] text-gray-400 uppercase">Dari Internet</div>
+                            <div id="comp-in" class="text-lg font-bold text-white">0 MB</div>
+                        </div>
+                        <div class="bg-black/30 rounded-xl p-3">
+                            <div class="text-[10px] text-gray-400 uppercase">Terkirim ke HP</div>
+                            <div id="comp-out" class="text-lg font-bold text-white">0 MB</div>
+                        </div>
+                        <div class="bg-black/30 rounded-xl p-3">
+                            <div class="text-[10px] text-gray-400 uppercase">Hemat Kuota</div>
+                            <div id="comp-ratio" class="text-lg font-bold text-green-400">0%</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleSvc('compress', true)" class="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xs transition">AKTIFKAN Kompresi</button>
+                        <button onclick="toggleSvc('compress', false)" class="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl text-xs transition">MATIKAN</button>
+                    </div>
+                    <p class="text-[10px] text-yellow-400/80 mt-3 leading-relaxed">
+                        <i class="fa-solid fa-circle-info"></i> Cara kerja: proxy di RAM memampatkan teks (HTML/CSS/JS/JSON) dengan gzip level 9.
+                        <b>Realistis:</b> hemat 30-70% untuk browsing teks. <b>Tidak bisa:</b> HTTPS (port 443), video, YouTube, aplikasi terenkripsi — data ini sudah terenkripsi end-to-end dan tidak dapat dikompresi tanpa merusak keamanan (MITM). Klaim "90% semua data" tidak mungkin secara teknis untuk traffic terenkripsi.
+                    </p>
+                </div>
+
+                <div class="card p-5 rounded-2xl border border-blue-500/30">
+                    <h3 class="text-blue-400 font-bold text-sm flex items-center gap-2 mb-3"><i class="fa-solid fa-shield-halved"></i> WIREGUARD VPN</h3>
+                    <textarea id="wg-config" rows="8" placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = ...&#10;&#10;[Peer]&#10;PublicKey = ...&#10;Endpoint = ...:51820&#10;AllowedIPs = 0.0.0.0/0" class="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-xs font-mono text-gray-200 focus:border-cyber-accent outline-none"></textarea>
+                    <div class="flex gap-2 mt-3">
+                        <button onclick="saveWg()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition">Simpan Config</button>
+                        <button onclick="toggleSvc('wireguard', true)" class="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xs transition">Connect</button>
+                        <button onclick="toggleSvc('wireguard', false)" class="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition">Disconnect</button>
+                    </div>
+                </div>
+
+                <div class="card p-5 rounded-2xl">
+                    <h3 class="text-cyber-accent font-bold text-sm flex items-center gap-2 mb-2"><i class="fa-solid fa-magnet"></i> TRANSMISSION (TORRENT)</h3>
+                    <p class="text-xs text-gray-400 mb-2">Web UI torrent client (jika di-install):</p>
+                    <a href="http://192.168.50.1:9091" target="_blank" class="block text-center py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition">Buka Transmission :9091</a>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+        <!-- JAVASCRIPT LOGIC & COOKIE AUTH ENGINE -->
+    <script>
+        // --- AUTHENTICATION & COOKIE SESSION ENGINE ---
+        const AUTH_COOKIE_NAME = "PMOS_VINCE_SESSION";
+        let MEM_SESSION = null;
+        let MEM_SESSION_EXPIRES = 0;
+
+        function setSession(value, hours) {
+            const expires = Date.now() + (hours * 60 * 60 * 1000);
+            MEM_SESSION = value;
+            MEM_SESSION_EXPIRES = expires;
+            try { localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify({ token: value, expires: expires })); } catch(e) {}
+        }
+        function getSession() {
+            if (MEM_SESSION && Date.now() < MEM_SESSION_EXPIRES) return MEM_SESSION;
+            try {
+                const raw = localStorage.getItem(AUTH_COOKIE_NAME);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (Date.now() > data.expires) { localStorage.removeItem(AUTH_COOKIE_NAME); return null; }
+                MEM_SESSION = data.token;
+                MEM_SESSION_EXPIRES = data.expires;
+                return data.token;
+            } catch(e) { return null; }
+        }
+        function clearSession() {
+            MEM_SESSION = null;
+            MEM_SESSION_EXPIRES = 0;
+            try { localStorage.removeItem(AUTH_COOKIE_NAME); } catch(e) {}
+        }
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        function checkAuth() {
+            const sessionToken = getSession();
+            const loginScreen = document.getElementById('login-screen');
+            const dashboardScreen = document.getElementById('dashboard-screen');
+            if (sessionToken) {
+                loginScreen.classList.add('hidden');
+                dashboardScreen.classList.remove('hidden');
+                startStatusPolling();
+            } else {
+                loginScreen.classList.remove('hidden');
+                dashboardScreen.classList.add('hidden');
+            }
+        }
+        function handleLogin(e) {
+            if (e) e.preventDefault();
+            const user = document.getElementById('login-user').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+            const btnText = document.getElementById('login-btn-text');
+            if (user === 'admin' && pass === 'vince123') {
+                try {
+                    if (btnText) { btnText.textContent = 'Memproses...'; }
+                    const sessionUUID = generateUUID();
+                    setSession(sessionUUID, 24);
+                    showToast('Login berhasil! Mengalihkan ke dashboard...', 'success');
+                    setTimeout(() => {
+                        try {
+                            checkAuth();
+                            const loginScreen = document.getElementById('login-screen');
+                            if (loginScreen && !loginScreen.classList.contains('hidden')) {
+                                if (btnText) { btnText.textContent = 'Masuk Dashboard'; }
+                                showToast('Gagal membuka dashboard. Coba lagi.', 'danger');
+                            }
+                        } catch(err) {
+                            if (btnText) { btnText.textContent = 'Masuk Dashboard'; }
+                            showToast('Error: ' + err.message, 'danger');
+                        }
+                    }, 500);
+                } catch(err) {
+                    if (btnText) { btnText.textContent = 'Masuk Dashboard'; }
+                    showToast('Login gagal: ' + err.message, 'danger');
+                }
+            } else {
+                showToast('Username atau password salah!', 'danger');
+            }
+        }
+        function handleLogout() {
+            clearSession();
+            window.location.href = '/logout';
+        }
+
+        // --- TAB NAVIGATION SYSTEM ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-cyber-accent/10', 'text-cyber-accent', 'border', 'border-cyber-accent/40');
+                btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-800');
+            });
+            const targetContent = document.getElementById(tabId);
+            if (targetContent) targetContent.classList.remove('hidden');
+            const targetBtn = document.getElementById('btn-' + tabId);
+            if (targetBtn) {
+                targetBtn.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-gray-800');
+                targetBtn.classList.add('bg-cyber-accent/10', 'text-cyber-accent', 'border', 'border-cyber-accent/40');
+            }
+        }
+
+        // --- TOAST NOTIFICATION ENGINE ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            let bgClass = 'bg-gray-800 border-gray-700 text-white';
+            let icon = 'fa-info-circle text-blue-400';
+            if (type === 'success') { bgClass = 'bg-cyber-800 border-green-500/40 text-white'; icon = 'fa-circle-check text-green-400'; }
+            else if (type === 'danger') { bgClass = 'bg-cyber-800 border-red-500/40 text-white'; icon = 'fa-circle-xmark text-red-400'; }
+            toast.className = 'p-4 rounded-xl border shadow-xl flex items-center gap-3 transition-all duration-300 pointer-events-auto transform translate-y-2 opacity-0 ' + bgClass;
+            toast.innerHTML = '<i class="fa-solid ' + icon + ' text-lg"></i> <span class="text-xs font-semibold">' + message + '</span>';
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // ============================================================
+        //  SERVER ACTION HELPER — SEMUA tombol memanggil ini (NYATA)
+        // ============================================================
+        function callAction(cmd, params, btn) {
+            params = params || {};
+            const body = new URLSearchParams();
+            body.append('cmd', cmd);
+            Object.keys(params).forEach(function(k) { body.append(k, params[k]); });
+            let origHTML = null;
+            if (btn) {
+                origHTML = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Memproses...';
+            } else {
+                showToast('Memproses perintah: ' + cmd + ' ...', 'info');
+            }
+            return fetch('/action?json=1', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                body: body.toString()
+            }).then(function(r) {
+                const ct = r.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) {
+                    showToast('Sesi berakhir. Memuat ulang halaman...', 'danger');
+                    setTimeout(function() { window.location.reload(); }, 1200);
+                    throw new Error('session-expired');
+                }
+                return r.json();
+            }).then(function(d) {
+                showToast(d.msg || (d.ok ? 'Berhasil.' : 'Gagal.'), d.ok ? 'success' : 'danger');
+                return d;
+            }).catch(function(err) {
+                if (err.message !== 'session-expired') {
+                    showToast('Gagal menghubungi server: ' + err.message, 'danger');
+                }
+                throw err;
+            }).finally(function() {
+                if (btn) {
+                    btn.disabled = false;
+                    if (origHTML !== null) btn.innerHTML = origHTML;
+                }
+            });
+        }
+
+        function fetchJSON(url) {
+            return fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(function(r) {
+                    const ct = r.headers.get('content-type') || '';
+                    if (!ct.includes('application/json')) throw new Error('session-expired');
+                    return r.json();
+                });
+        }
+
+        // --- REAL-TIME STATUS POLLING (dari /api/status) ---
+        let timerSeconds = 3;
+        function startStatusPolling() {
+            fetchStatusData();
+            setInterval(() => {
+                timerSeconds--;
+                if (timerSeconds <= 0) { fetchStatusData(); timerSeconds = 3; }
+                const timerEl = document.getElementById('status-timer');
+                if (timerEl) timerEl.textContent = 'Updating in ' + timerSeconds + 's';
+            }, 1000);
+        }
+        function fetchStatusData() {
+            fetchJSON('/api/status')
+                .then(function(data) { updateStatusUI(data); })
+                .catch(function(err) {
+                    if (err.message === 'session-expired') return;
+                    // Mock fallback jika diakses via file:// tanpa backend
+                    const mockData = {
+                        battery: { level: Math.floor(80 + Math.random() * 5), temp: (33 + Math.random()).toFixed(1), charging: false },
+                        cpu: { load: [(0.3 + Math.random()*0.2).toFixed(2), (0.35 + Math.random()*0.1).toFixed(2), '0.32'] },
+                        ram: { used: Math.floor(1100 + Math.random() * 50), total: 2950 },
+                        uptime: '2d 14h 35m'
+                    };
+                    updateStatusUI(mockData);
+                });
+        }
+        function setText(id, txt) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = txt;
+        }
+        function updateStatusUI(data) {
+            let level, temp, charging, cpuLoad, ramUsed, ramTotal, uptime;
+            if (data.battery_cap !== undefined) {
+                // Format server vince-webui.py: battery_cap, battery_status, battery_temp, ram, cpu, uptime
+                level = parseInt(data.battery_cap) || 0;
+                temp = (data.battery_temp || '').replace('°C', '');
+                charging = /charg/i.test(data.battery_status || '');
+                cpuLoad = [data.cpu || 'N/A'];
+                const m = (data.ram || '').match(/(\d+)MB\s*\/\s*(\d+)MB/);
+                ramUsed = m ? parseInt(m[1]) : 0;
+                ramTotal = m ? parseInt(m[2]) : 2950;
+                uptime = data.uptime || '';
+            } else {
+                level = data.battery.level;
+                temp = data.battery.temp;
+                charging = data.battery.charging;
+                cpuLoad = data.cpu.load;
+                ramUsed = data.ram.used;
+                ramTotal = data.ram.total;
+                uptime = data.uptime || '';
+            }
+            setText('bat-val', level + '%');
+            setText('stat-bat-val', level + '%');
+            setText('bat-temp', temp + '°C');
+            setText('stat-bat-temp', temp + '°C');
+            const badge = document.getElementById('bat-status-badge');
+            const statusTxt = document.getElementById('stat-bat-status');
+            const batIcon = document.getElementById('bat-icon');
+            const batBar = document.getElementById('stat-bat-bar');
+            if (charging) {
+                if (badge) { badge.textContent = 'CHARGING'; badge.className = 'text-[9px] px-1.5 py-0.2 bg-green-500/20 text-green-400 rounded font-semibold'; }
+                if (statusTxt) { statusTxt.textContent = 'Charging'; statusTxt.className = 'text-green-400 font-semibold'; }
+                if (batIcon) batIcon.className = 'fa-solid fa-battery-charging text-green-400 text-lg';
+            } else {
+                if (badge) { badge.textContent = 'DISCHARGING'; badge.className = 'text-[9px] px-1.5 py-0.2 bg-gray-800 text-gray-300 rounded font-semibold'; }
+                if (statusTxt) { statusTxt.textContent = 'Discharging'; statusTxt.className = 'text-yellow-400 font-semibold'; }
+                if (batIcon) batIcon.className = 'fa-solid fa-battery-three-quarters text-cyber-accent text-lg';
+            }
+            if (batBar) batBar.style.width = Math.min(100, level) + '%';
+            setText('stat-cpu-load', cpuLoad.join(', '));
+            setText('stat-ram-used', ramUsed);
+            const ramPct = ramTotal ? Math.round((ramUsed / ramTotal) * 100) : 0;
+            setText('stat-ram-pct', ramPct + '%');
+            const ramBar = document.getElementById('stat-ram-bar');
+            if (ramBar) ramBar.style.width = ramPct + '%';
+            const cpuBar = document.getElementById('stat-cpu-bar');
+            if (cpuBar) cpuBar.style.width = Math.min(100, (parseFloat(cpuLoad[0]) || 0) * 50) + '%';
+            setText('stat-uptime', uptime);
+        }
+
+        // --- UI HELPERS ---
+        function togglePassVisibility(id) {
+            const input = document.getElementById(id);
+            if (input) input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        // ============================================================
+        //  ACTION HANDLERS — semuanya memanggil endpoint server NYATA
+        // ============================================================
+        function saveHotspot(e) {
+            e.preventDefault();
+            const ssid = (document.getElementById('ap-ssid').value || '').trim();
+            const psk = document.getElementById('ap-pass').value || '';
+            if (!ssid) return showToast('SSID tidak boleh kosong.', 'danger');
+            if (psk.length < 8) return showToast('Password hotspot minimal 8 karakter.', 'danger');
+            callAction('set_hotspot', { ssid: ssid, psk: psk }, document.getElementById('btn-save-hotspot'));
+        }
+
+        function scanWifi() {
+            const btn = document.getElementById('btn-scan-wifi');
+            const select = document.getElementById('wifi-target-select');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Memindai...'; }
+            fetchJSON('/api/scan-wifi')
+                .then(function(d) {
+                    if (!select) return;
+                    select.innerHTML = '';
+                    const nets = d.networks || [];
+                    if (!nets.length) {
+                        select.innerHTML = '<option value="">Tidak ada WiFi ditemukan</option>';
+                    } else {
+                        nets.forEach(function(x) {
+                            const o = document.createElement('option');
+                            o.value = x.ssid;
+                            o.textContent = x.ssid + ' (Sinyal: ' + x.signal + '% • ' + x.security + ')';
+                            select.appendChild(o);
+                        });
+                    }
+                    if (d.error) showToast(d.error, 'info');
+                    showToast('Pemindaian Wi-Fi selesai: ' + nets.length + ' jaringan ditemukan.', 'success');
+                })
+                .catch(function(err) {
+                    if (select) select.innerHTML = '<option value="">Gagal memindai</option>';
+                    if (err.message !== 'session-expired') showToast('Gagal memindai WiFi: ' + err.message, 'danger');
+                })
+                .finally(function() {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-magnifying-glass text-cyber-accent"></i> Pindai Wi-Fi Live'; }
+                });
+        }
+
+        function connectRepeater(e) {
+            e.preventDefault();
+            const target = (document.getElementById('wifi-target-select').value || '').trim();
+            const psk = document.getElementById('repeater-pass').value || '';
+            if (!target) return showToast('Pilih Wi-Fi target terlebih dahulu (klik Pindai).', 'danger');
+            callAction('set_repeater', { target_ssid: target, target_psk: psk, target_ssid_manual: '' }, document.getElementById('btn-connect-repeater'));
+        }
+
+        function clearRepeater() {
+            callAction('clear_repeater', {}, document.getElementById('btn-clear-repeater'));
+        }
+
+        function toggleCellularData(el) {
+            const prev = !el.checked;
+            callAction('set_mobile_data', { state: el.checked ? 'on' : 'off' })
+                .then(function(d) { if (!d.ok) el.checked = prev; })
+                .catch(function() { el.checked = prev; });
+        }
+
+        function saveAPN() {
+            const apn = (document.getElementById('sim-apn').value || '').trim();
+            callAction('set_apn', { apn: apn, apn_user: '', apn_pass: '' }, document.getElementById('btn-save-apn'));
+        }
+
+        function changeNetworkLock(el) {
+            const map = { lte_only: '4g', auto: 'auto', wcdma: '3g' };
+            const mode = map[el.value] || 'auto';
+            const prev = el.dataset.prev || 'auto';
+            callAction('set_network_mode', { mode: mode })
+                .then(function(d) { if (!d.ok) el.value = prev; else el.dataset.prev = el.value; })
+                .catch(function() { el.value = prev; });
+        }
+
+        function toggleTTLBypass(el) {
+            const prev = !el.checked;
+            callAction('set_ttl', { ttl_state: el.checked ? 'on' : 'off' })
+                .then(function(d) { if (!d.ok) el.checked = prev; })
+                .catch(function() { el.checked = prev; });
+        }
+
+        function backupIMEI() {
+            const btn = document.getElementById('btn-backup-imei');
+            if (btn) btn.disabled = true;
+            fetchJSON('/api/imei-backup')
+                .then(function(d) {
+                    const text = d.text || ('IMEI Backup pmos-vince (read-only)\nWaktu: ' + new Date().toISOString() + '\n');
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'imei_backup_readonly.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    showToast('Berkas backup IMEI (read-only) berhasil diunduh.', 'success');
+                    const m = text.match(/IMEI:\s*(\d+)/);
+                    const ci = document.getElementById('current-imei');
+                    if (ci && m) ci.value = m[1];
+                })
+                .catch(function(err) {
+                    const imei = (document.getElementById('current-imei') || {}).value || 'tidak-terbaca';
+                    const blob = new Blob(['IMEI Backup pmos-vince (read-only)\nIMEI: ' + imei + '\nWaktu: ' + new Date().toISOString() + '\n'], { type: 'text/plain' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'imei_backup_readonly.txt';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    if (err.message !== 'session-expired') showToast('Backup IMEI diunduh (mode offline).', 'success');
+                })
+                .finally(function() { if (btn) btn.disabled = false; });
+        }
+
+        function writeIMEI() {
+            // TIDAK ADA fetch ke server. Penulisan IMEI tidak diimplementasi (legal & keamanan).
+            showToast('Penulisan IMEI tidak didukung untuk alasan legal & keamanan. Gunakan fitur backup IMEI saja.', 'danger');
+        }
+
+        // --- Equalizer 5-band state ---
+        const EQ_STATE = { '60': '2', '230': '4', '910': '0', '4k': '3', '14k': '5' };
+        function updateEqValue(band, val) {
+            EQ_STATE[band] = String(val);
+            const el = document.getElementById('eq-val-' + band);
+            if (el) el.textContent = (val > 0 ? '+' : '') + val + ' dB';
+        }
+        function eqParams() {
+            return {
+                preset: (document.getElementById('audio-dolby-preset') || {}).value || 'flat',
+                band_60: EQ_STATE['60'], band_230: EQ_STATE['230'], band_910: EQ_STATE['910'],
+                band_4k: EQ_STATE['4k'], band_14k: EQ_STATE['14k']
+            };
+        }
+        function applyDolbyPreset(preset) {
+            callAction('set_equalizer', eqParams());
+        }
+        function saveEqualizer() {
+            callAction('set_equalizer', eqParams(), document.getElementById('btn-save-eq'));
+        }
+        function setVolume(val) {
+            callAction('set_volume', { volume: String(parseInt(val) || 100) });
+        }
+        function toggleMuteBtn() {
+            callAction('toggle_mute', {});
+        }
+
+        function saveBluetoothAlias(e) {
+            e.preventDefault();
+            const name = (document.getElementById('bt-alias-name').value || '').trim();
+            if (!name) return showToast('Nama Bluetooth tidak boleh kosong.', 'danger');
+            callAction('set_bt_name', { bt_name: name }, document.getElementById('btn-save-bt'));
+        }
+        function toggleBT(state) {
+            callAction('set_bt_service', { bt_state: state });
+        }
+
+        function changeUsbMode(mode) {
+            callAction('set_usb_mode', { mode: mode });
+        }
+        function autoAllowADB() {
+            callAction('set_adb_auto_allow', { state: '1' }, document.getElementById('btn-adb-sync'));
+        }
+
+        function changeLedTrigger(trigger) {
+            callAction('set_led_trigger', { trigger: trigger });
+        }
+        let ledTimer = null;
+        function updateLedBrightness(val) {
+            setText('led-val-disp', val);
+            if (ledTimer) clearTimeout(ledTimer);
+            ledTimer = setTimeout(function() {
+                callAction('set_led_brightness', { brightness: String(val) });
+            }, 600);
+        }
+
+        function restartSamba() {
+            callAction('restart_samba', {}, document.getElementById('btn-restart-samba'));
+        }
+
+        function runDiagnostics() {
+            const box = document.getElementById('diag-log-box');
+            const btn = document.getElementById('btn-run-diag');
+            if (box) box.textContent = '[INIT] Memanggil /api/diag (vince-diag & vince-audio-diag)...\n';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Menjalankan...'; }
+            fetchJSON('/api/diag')
+                .then(function(d) {
+                    if (box) box.textContent = '=== SISTEM (vince-diag) ===\n' + (d.sys_diag || '(kosong)') + '\n\n=== AUDIO (vince-audio-diag) ===\n' + (d.audio_diag || '(kosong)');
+                    showToast('Diagnostik selesai. Lihat output di konsol.', 'success');
+                })
+                .catch(function(err) {
+                    if (box) box.textContent = '[ERROR] Gagal mengambil diagnostik: ' + err.message;
+                    if (err.message !== 'session-expired') showToast('Gagal menjalankan diagnostik.', 'danger');
+                })
+                .finally(function() {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-play"></i> Jalankan Tes Hardware'; }
+                });
+        }
+        function clearDiagLogs() {
+            const box = document.getElementById('diag-log-box');
+            if (box) box.textContent = '[CLEARED] Logs direset.\n';
+        }
+
+        function openRebootModal() {
+            const m = document.getElementById('reboot-modal');
+            if (m) m.classList.remove('hidden');
+        }
+        function closeRebootModal() {
+            const m = document.getElementById('reboot-modal');
+            if (m) m.classList.add('hidden');
+        }
+        function confirmReboot() {
+            closeRebootModal();
+            callAction('reboot', {}).then(function() {
+                showToast('Perintah reboot dikirim. Perangkat akan restart ~45 detik.', 'danger');
+            });
+        }
+
+        // --- INITIALIZATION ---
+        (function initPrev() {
+            const nm = document.getElementById('sim-network-mode');
+            if (nm) nm.dataset.prev = nm.value;
+        })();
+        // Baca IMEI read-only saat load (jika modem ada)
+        try {
+            fetchJSON('/api/imei-backup').then(function(d) {
+                const m = (d.text || '').match(/IMEI:\s*(\d+)/);
+                const ci = document.getElementById('current-imei');
+                if (ci && m) ci.value = m[1];
+            }).catch(function() {});
+        } catch(e) {}
+
+        // MODE SERVER (disajikan oleh vince-webui.py): auth sudah diverifikasi server via cookie.
+        // Set session client-side agar login screen dilewati (tidak dobel login).
+        setSession('server-authed', 24);
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', checkAuth);
+        } else {
+            checkAuth();
+        }
+
+        /* ===== OPENWRT / ROUTER EXTRAS ===== */
+        const OWRT_SVCS = [
+            {key:"sqm",        label:"SQM Anti-Lag (CAKE)", desc:"Bermain game & video call lancar"},
+            {key:"adblock",    label:"Adblock",             desc:"Blok iklan & tracker via DNS"},
+            {key:"upnp",       label:"UPnP",                desc:"Port forwarding otomatis"},
+            {key:"minidlna",   label:"miniDLNA",            desc:"Media server ke TV"},
+            {key:"transmission", label:"Transmission",      desc:"Torrent client (port 9091)"},
+            {key:"openvpn",    label:"OpenVPN",             desc:"Koneksi VPN OpenVPN"},
+        ];
+        function fmtBytes(n){ n=Number(n)||0; if(n>=1e9) return (n/1e9).toFixed(2)+" GB"; if(n>=1e6) return (n/1e6).toFixed(1)+" MB"; if(n>=1e3) return (n/1e3).toFixed(0)+" KB"; return n+" B"; }
+        function renderOwrt(d){
+            const box = document.getElementById('owrt-services');
+            if(!box) return;
+            box.innerHTML = OWRT_SVCS.map(s=>{
+                const on = d.services && d.services[s.key];
+                return `<div class="bg-black/30 rounded-xl p-3 border ${on?'border-green-500/40':'border-gray-700'}">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-semibold text-white">${s.label}</span>
+                        <span class="text-[10px] font-bold ${on?'text-green-400':'text-gray-500'}">${on?'● AKTIF':'○ OFF'}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-400 mb-2">${s.desc}</div>
+                    <div class="flex gap-1.5">
+                        <button onclick="toggleSvc('${s.key}',true)" class="flex-1 py-1.5 ${on?'bg-green-600/30 text-green-300':'bg-green-600 text-white'} hover:bg-green-500 rounded-lg text-[10px] font-bold transition">ON</button>
+                        <button onclick="toggleSvc('${s.key}',false)" class="flex-1 py-1.5 ${on?'bg-red-600 text-white':'bg-gray-700 text-gray-300'} hover:bg-red-500 rounded-lg text-[10px] font-bold transition">OFF</button>
+                    </div>
+                </div>`;
+            }).join('');
+            const c = d.compression || {};
+            document.getElementById('comp-in').textContent = fmtBytes(c.bytes_in);
+            document.getElementById('comp-out').textContent = fmtBytes(c.bytes_out);
+            document.getElementById('comp-ratio').textContent = (c.ratio||0)+'%';
+            const wg = document.getElementById('wg-config');
+            if(wg && d.wg_config && !wg.value) wg.value = d.wg_config;
+        }
+        function loadOwrt(){
+            if(document.getElementById('tab-openwrt').classList.contains('hidden')) return;
+            fetch('/api/openwrt',{credentials:'same-origin',headers:{'Accept':'application/json'}})
+                .then(r=>r.json()).then(renderOwrt).catch(()=>{});
+        }
+        function toggleSvc(svc, on){
+            const fd = new FormData(); fd.append('cmd','toggle_svc'); fd.append('svc',svc); fd.append('state', on?'on':'off');
+            fetch('/action?json=1',{method:'POST',credentials:'same-origin',body:fd})
+                .then(r=>r.json()).then(d=>{ alert((d.ok?'OK: ':'Gagal: ')+(d.msg||'')); loadOwrt(); })
+                .catch(e=>alert('Error: '+e));
+        }
+        function saveWg(){
+            const cfg = document.getElementById('wg-config').value;
+            const fd = new FormData(); fd.append('cmd','set_wireguard'); fd.append('wg_config', cfg);
+            fetch('/action?json=1',{method:'POST',credentials:'same-origin',body:fd})
+                .then(r=>r.json()).then(d=>alert((d.ok?'OK: ':'Gagal: ')+(d.msg||'')))
+                .catch(e=>alert('Error: '+e));
+        }
+        setInterval(loadOwrt, 4000);
+        setTimeout(loadOwrt, 1500);
+    </script>
+
+</body>
+</html>

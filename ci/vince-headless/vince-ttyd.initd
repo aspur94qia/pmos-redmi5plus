@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+
+description="ttyd terminal web (port 7681)"
+
+command=/usr/bin/ttyd
+command_args="-W -p 7681 /bin/login"
+command_background=true
+pidfile=/run/vince-ttyd.pid
+
+depend() {
+	use net
+}
+
+start_pre() {
+	if [ -r /etc/vince/smb-pass ]; then
+		command_args="-W -p 7681 -c user:$(cat /etc/vince/smb-pass) /bin/login"
+	fi
+}

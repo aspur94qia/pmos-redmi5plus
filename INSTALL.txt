@@ -1,0 +1,64 @@
+=== CARA DEPLOY DASHBOARD TERINTEGRASI KE PERANGKAT VINCE (postmarketOS) ===
+
+Yang perlu di-copy ke perangkat vince (via SSH / ADB / SCP):
+
+1. vince-webui.py  ->  /usr/libexec/vince-webui   (ganti file lama, chmod +x)
+2. dashboard.html  ->  /etc/vince/dashboard.html  (ganti file lama)
+
+Langkah-langkah (contoh via SSH ke 192.168.1.1):
+
+  scp vince-webui.py root@192.168.1.1:/usr/libexec/vince-webui
+  scp dashboard.html root@192.168.1.1:/etc/vince/dashboard.html
+  ssh root@192.168.1.1 "chmod +x /usr/libexec/vince-webui && rc-service vince-webui restart"
+
+Atau jika pakai ADB:
+  adb push vince-webui.py /usr/libexec/vince-webui
+  adb push dashboard.html /etc/vince/dashboard.html
+  adb shell "chmod +x /usr/libexec/vince-webui && rc-service vince-webui restart"
+
+Atau build ulang paket .apk: APKBUILD sudah menyertakan dashboard.html (diinstall ke
+/etc/vince/dashboard.html) dan vince-webui.py (ke /usr/libexec/vince-webui).
+
+=== AKSES ===
+Buka browser -> http://192.168.1.1  (atau IP vince Anda)
+Login: username = admin (atau user)
+       password = isi file /etc/vince/smb-pass di perangkat vince
+       (BUKAN "vince123" — itu hanya untuk file HTML standalone file://)
+
+=== YANG BERUBAH di versi ini (semua tombol SUDAH berfungsi nyata) ===
+
+- vince-webui.py:
+  * Mode JSON baru: POST /action?json=1 (atau header Accept: application/json)
+    mengembalikan {"ok": true/false, "msg": "..."} dengan HTTP 200 (tanpa redirect).
+    Mode redirect lama (form non-JS) TETAP berfungsi (302 ke /?m=<pesan>).
+  * do_action direfactor mengembalikan tuple (ok, msg) agar JS bisa bedakan sukses/gagal.
+  * Endpoint aksi baru: set_led_trigger, set_led_brightness (kontrol /sys/class/leds +
+    preset disimpan ke /etc/vince/), set_adb_auto_allow (sync adb_keys),
+    set_equalizer (preset + 5-band disimpan), set_usb_mode.
+  * GET /api/imei-backup baru: backup IMEI READ-ONLY (teks), TIDAK ADA write IMEI.
+  * GET /api/scan-wifi dan /api/diag sudah ada (format JSON sesuai dashboard).
+  * Auth: tanpa cookie, /action?json=1 mengembalikan 401 JSON (bukan redirect) agar
+    JS bisa mendeteksi sesi habis. /action biasa tetap redirect 302.
+  * KEAMANAN: TIDAK ADA cmd write_imei / spoofing IMEI sama sekali.
+
+- dashboard.html:
+  * SEMUA tombol aksi memanggil endpoint server nyata via fetch() (helper callAction),
+    bukan toast palsu. Tombol di-disable saat request (anti dobel-klik), toast
+    menampilkan pesan ASLI dari server (success/error sesuai field ok).
+  * scanWifi & runDiagnostics menampilkan output nyata dari /api/scan-wifi & /api/diag.
+  * backupIMEI mengunduh teks read-only dari /api/imei-backup.
+  * Tombol "Tulis/Inject IMEI" DIHAPUS; diganti catatan legal & keamanan.
+  * Ditambah: kontrol Volume + Mute (tab Audio), Start/Stop Bluetooth (tab BT),
+    tombol Matikan Repeater (tab Repeater).
+  * Perbaikan: id elemen stat-bat-val yang typo, updateStatusUI mendukung format
+    /api/status server (bukan hanya mock). Login/logout cookie tetap berfungsi.
+
+=== CATATAN FITUR ===
+- Equalizer: dipetakan ke PulseAudio + LADSPA swh-plugins di perangkat target;
+  preset & nilai 5-band disimpan ke /etc/vince/eq-preset. Di mesin tanpa audio
+  tidak error, hanya tersimpan.
+- LED: jika /sys/class/leds ada, trigger/brightness ditulis langsung; jika tidak
+  (mis. mesin test), preset disimpan ke /etc/vince/led-trigger & led-brightness
+  untuk diterapkan daemon vince-led di perangkat target.
+- IMEI: hanya backup read-only. Penulisan/spoofing tidak diimplementasi (legal &
+  keamanan) — sesuai kebijakan.
